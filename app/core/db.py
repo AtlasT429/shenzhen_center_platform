@@ -5,12 +5,10 @@ from sqlalchemy.orm import sessionmaker
 
 def get_database_url() -> str:
     """获取数据库连接字符串（优先级：环境变量 -> Streamlit Secrets -> 本地默认）"""
-    # 1. 读取系统环境变量
     db_url = os.getenv("DATABASE_URL")
     if db_url:
         return db_url
 
-    # 2. 从 Streamlit Cloud Secrets 读取
     try:
         if "DATABASE_URL" in st.secrets:
             return st.secrets["DATABASE_URL"]
@@ -20,7 +18,6 @@ def get_database_url() -> str:
     except Exception:
         pass
 
-    # 3. 本地环境默认 fallback
     user = os.getenv("DB_USER", "root")
     password = os.getenv("DB_PASSWORD", "123456")
     host = os.getenv("DB_HOST", "localhost")
@@ -31,12 +28,16 @@ def get_database_url() -> str:
 
 DATABASE_URL = get_database_url()
 
-# 打印日志辅助排查（只显示 Host，隐藏密码）
+# 过滤 URL 中传入的 ssl_mode 参数，避免 PyMySQL 解析报错
+if "ssl_mode=" in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("?ssl_mode=REQUIRED", "").replace("&ssl_mode=REQUIRED", "")
+
+# 打印日志辅助排查（只显示 Host）
 print(f"[DB Config Check] Connecting to host: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}")
 
-# Aiven 云数据库强制启用 SSL
+# PyMySQL 专属 SSL 参数配置
 connect_args = {}
-if "aivencloud.com" in DATABASE_URL or "ssl_mode" in DATABASE_URL:
+if "aivencloud.com" in DATABASE_URL:
     connect_args["ssl"] = {"ssl_mode": "REQUIRED"}
 
 # 创建 Engine
